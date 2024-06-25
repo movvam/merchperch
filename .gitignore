@@ -1,0 +1,13 @@
+### macOS ###
+.DS_Store
+.AppleDouble
+.LSOverride
+### react ###
+.DS_*
+*.log
+logs
+**/*.backup.*
+**/*.back.*
+
+node_modules
+bower_components
