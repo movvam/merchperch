@@ -30,12 +30,9 @@ function ArtistJsonDataDisplay(){
           <a href={"https://"+info.shopify_url} target="_blank" rel="noopener noreferrer">
             <Card backgroundImage={info.photo_url} className="auto-rows-auto  h-60 pb-60 cursor-pointer">
               <CardContent className="auto-rows-auto	">
-
-
-
-                <text className="spotify-artist-name-text">
+                <p className="spotify-artist-name-text">
                       {info.name}
-                    </text>
+                    </p>
               </CardContent>
 
             </Card>
@@ -46,7 +43,7 @@ function ArtistJsonDataDisplay(){
 	)
 
 	return(
-		<div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
 			{DisplayData}
 		</div>
 	)
