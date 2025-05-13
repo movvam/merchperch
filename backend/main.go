@@ -11,9 +11,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"sync"
 
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
@@ -26,20 +28,22 @@ import (
 // and enter this value.
 const redirectURI = "http://localhost:8080/callback"
 
+type ShopArtist struct {
+	NAME             string          `json:"name"`
+	ID               string          `json:"id"`
+	SPOTIFY_SHOP_URL string          `json:"spotify_shop_url"`
+	SHOPIFY_URL      string          `json:"shopify_url"`
+	PHOTO_URL        string          `json:"photo_url"`
+	POPULARITY       spotify.Numeric `json:"popularity"`
+}
+
 var (
 	auth             = spotifyauth.New(spotifyauth.WithRedirectURL(redirectURI), spotifyauth.WithScopes(spotifyauth.ScopeUserFollowRead, spotifyauth.ScopeUserLibraryRead))
 	ch               = make(chan *spotify.Client)
 	state            = "abc123"
 	artistsWithShops []spotify.FullArtist
+	shopArtists      []ShopArtist
 )
-
-type ShopArtist struct {
-	NAME       string          `json:"name"`
-	ID         string          `json:"id"`
-	SHOP_URL   string          `json:"shop_url"`
-	PHOTO_URL  string          `json:"photo_url"`
-	POPULARITY spotify.Numeric `json:"popularity"`
-}
 
 func main() {
 	// first start an HTTP server
@@ -80,8 +84,8 @@ func main() {
 		}
 	}
 
+	// print out number of followed artists
 	fmt.Println(followedArtistsResp.Total)
-	fmt.Println(numArtistsGot)
 
 	// Figure out which artists have connected their Shopify shops with Spotify
 	wg := sync.WaitGroup{}
@@ -111,7 +115,7 @@ func buildShopArtist(artist spotify.FullArtist) ShopArtist {
 
 	shopArtist.ID = id
 	shopArtist.NAME = name
-	shopArtist.SHOP_URL = shopUrl
+	shopArtist.SPOTIFY_SHOP_URL = shopUrl
 	shopArtist.PHOTO_URL = photoUrl
 	shopArtist.POPULARITY = artist.Popularity
 	return shopArtist
@@ -122,10 +126,15 @@ func writeShops() {
 	var artistsJson []ShopArtist
 
 	// Build the list of ShopArtist objects
-	for _, artist := range artistsWithShops {
-		shopArtist := buildShopArtist(artist)
+	// for _, artist := range artistsWithShops {
+	// 	shopArtist := buildShopArtist(artist)
+	// 	artistsJson = append(artistsJson, shopArtist)
+	// }
+
+	for _, shopArtist := range shopArtists {
 		artistsJson = append(artistsJson, shopArtist)
 	}
+
 	// Write to JSON file
 	data := []byte(dataStr)
 	err := os.WriteFile("followed_artists.txt", data, 0644)
@@ -142,9 +151,41 @@ func writeShops() {
 func makeShopExistenceCheckRequest(wg *sync.WaitGroup, artist spotify.FullArtist) {
 	resp, err := http.Get(fmt.Sprintf("https://generic.wg.spotify.com/shopify-merch/public/v0/artist/%v/storefront-token", artist.ID.String()))
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalln("HTTP error:", err)
 	}
+
 	if resp.StatusCode == 200 {
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalln("Failed to read response body:", err)
+		}
+
+		fmt.Println("body:", body)
+
+		// Extract 32-char hex token
+		tokenRe := regexp.MustCompile(`[a-f0-9]{32}`)
+		token := tokenRe.Find(body)
+		log.Println("token", string(token))
+
+		// Extract the first .myshopify.com domain
+		re := regexp.MustCompile(`[a-zA-Z0-9\-]+\.myshopify\.com`)
+		match := re.Find(body)
+		if match == nil {
+			log.Println("No Shopify domain found")
+			return
+		}
+
+		fmt.Println("Shopify URL:", string(match))
+
+		shopArtists = append(shopArtists, ShopArtist{
+			ID:               artist.ID.String(),
+			NAME:             artist.Name,
+			SPOTIFY_SHOP_URL: fmt.Sprintf("https://shop.spotify.com/en/artist/%v/store", artist.ID.String()),
+			SHOPIFY_URL:      string(match),
+			PHOTO_URL:        artist.Images[0].URL,
+			POPULARITY:       artist.Popularity,
+		})
 		artistsWithShops = append(artistsWithShops, artist)
 	}
 	wg.Done()
