@@ -1,24 +1,26 @@
 // import { useState } from 'react'
 // import { Button } from "@/components/ui/button"
-import ArtistJsonDataDisplay from "@/components/artistJsonTable"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Routes, Route } from "react-router-dom"
 import ArtistsPage from "./pages/artists"
 import ProductsPage from "./pages/products"
 import NavBar from "./components/ui/navbar"
+import { useRef, useLayoutEffect, useState } from 'react'
 
 
 function App() {
+  const navRef = useRef<HTMLDivElement>(null)
+  const [navHeight, setNavHeight] = useState(0)
+
+  useLayoutEffect(() => {
+    if (navRef.current) {
+      setNavHeight(navRef.current.offsetHeight)
+    }
+  }, [])
+
   return (
     <>
-      <NavBar />
+      <NavBar ref={navRef} />
+      <div style={{ paddingTop: navHeight }}/>
       <Routes>
         <Route path="/" element={<ArtistsPage />} />
         <Route path="/products" element={<ProductsPage />} />
