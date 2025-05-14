@@ -1,6 +1,5 @@
 
 // import React from 'react'
-import JsonData from '../data/products.json'
 import {
   Card,
   CardContent
@@ -8,14 +7,13 @@ import {
 import { cn } from "@/lib/utils"
 import { WindowScroller, AutoSizer, Grid } from 'react-virtualized'
 
-const products = JsonData as ProductData[]
 // maybe make these dynamic in the future
 const COLUMN_WIDTH = 300
 const ROW_HEIGHT = 320
 const GAP = 16 // Optional spacing
 const columnCount = 3 // Or calculate based on screen width dynamically
 
-type ProductData = {
+export type ProductData = {
   product: {
     id: string;
     title: string;
@@ -76,10 +74,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ productData }) => {
   )
 }
 
+type ProductDisplayProps = {
+  products: ProductData[]
+}
 
-
-
-function ProductJsonDataDisplay() {
+function ProductJsonDataDisplay(props: ProductDisplayProps) {
+  const products = props.products
   return(
 <WindowScroller>
   {({ height, isScrolling, onChildScroll, scrollTop }) => (
