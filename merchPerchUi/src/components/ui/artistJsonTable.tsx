@@ -1,6 +1,6 @@
 
 // import React from 'react'
-import JsonData from '../../data/shopData.json'
+import JsonData from '../../data/artistShops.json'
 import {
   Card,
   CardContent
