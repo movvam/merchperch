@@ -6,9 +6,14 @@ import {
   CardContent
 } from "./ui/card"
 import { cn } from "@/lib/utils"
-import { FixedSizeGrid as Grid } from 'react-window'
+import { WindowScroller, AutoSizer, Grid } from 'react-virtualized'
 
 const products = JsonData as ProductData[]
+// maybe make these dynamic in the future
+const COLUMN_WIDTH = 300
+const ROW_HEIGHT = 320
+const GAP = 16 // Optional spacing
+const columnCount = 3 // Or calculate based on screen width dynamically
 
 type ProductData = {
   product: {
@@ -52,67 +57,66 @@ function Container({
   )
 }
 
-function ProductCard(){
-	const DisplayData=products.map(
-		(productData: ProductData)=>{
-			return(
-        <Container>
-            <Card 
-            backgroundImage={productData.product.images.edges[0]?.node.url} 
-            className="auto-rows-auto  h-60 pb-60 cursor-pointer">
-              <CardContent className="auto-rows-auto	">
-                <p className="spotify-product-name-text">
-                  {productData.product.title}
-                </p>
-              </CardContent>
-
-            /</Card>
-        </Container>
-			)
-		}
-	)
-
-	return(
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-			{DisplayData}
-		</div>
-	)
+type ProductCardProps = {
+  productData: ProductData
 }
+
+const ProductCard: React.FC<ProductCardProps> = ({ productData }) => {
+  return (
+    <div className="h-60 pb-60 cursor-pointer bg-cover bg-center border rounded">
+      <img
+        src={productData.product.images.edges[0]?.node.url}
+        alt={productData.product.title}
+        className="w-full h-40 object-cover"
+      />
+      <div className="p-2">
+        <p className="spotify-product-name-text">{productData.product.title}</p>
+      </div>
+    </div>
+  )
+}
+
+
 
 
 function ProductJsonDataDisplay() {
   return(
-    <Grid
-  columnCount={3}
-  columnWidth={300}
-  height={800}
-  rowCount={Math.ceil(products.length / 3)}
-  rowHeight={300}
-  width={1000}
->
-  {({ columnIndex, rowIndex, style }) => {
-    const index = rowIndex * 3 + columnIndex
-    const product = products[index]
-    if (!product) return null
+<WindowScroller>
+  {({ height, isScrolling, onChildScroll, scrollTop }) => (
+    <AutoSizer disableHeight>
+      {({ width }) => {
+        const columnCount = Math.floor(width / (COLUMN_WIDTH + GAP))
+        const rowCount = Math.ceil(products.length / columnCount)
 
-    return (
-      <div style={style}>
-          {/* <Container> */}
-            <Card 
-            backgroundImage={product.product.images.edges[0]?.node.url} 
-            className="auto-rows-auto  h-60 pb-60 cursor-pointer">
-              <CardContent className="auto-rows-auto	">
-                <p className="spotify-product-name-text">
-                  {product.product.title}
-                </p>
-              </CardContent>
+        return (
+          <Grid
+            autoHeight
+            height={height}
+            width={width}
+            columnWidth={COLUMN_WIDTH}
+            columnCount={columnCount}
+            rowHeight={ROW_HEIGHT}
+            rowCount={rowCount}
+            isScrolling={isScrolling}
+            onScroll={onChildScroll}
+            scrollTop={scrollTop}
+            cellRenderer={({ columnIndex, rowIndex, key, style }) => {
+              const index = rowIndex * columnCount + columnIndex
+              const product = products[index]
+              if (!product) return null
 
-            /</Card>
-        {/* </Container> */}
-      </div>
-    )
-  }}
-</Grid>
+              return (
+                <div key={key} style={{ ...style, padding: GAP / 2 }}>
+                  <ProductCard productData={product} />
+                </div>
+              )
+            }}
+          />
+        )
+      }}
+    </AutoSizer>
+  )}
+</WindowScroller>
   )
 }
 
