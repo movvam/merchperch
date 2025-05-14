@@ -1,4 +1,4 @@
-import ProductJsonDataDisplay from "@/components/ui/productsJsonDataDisplay";
+import ProductJsonDataDisplay from "@/components/productsJsonDataDisplay";
 
 function ProductsPage() {
   return (

@@ -1,6 +1,6 @@
 // import { useState } from 'react'
 // import { Button } from "@/components/ui/button"
-import ArtistJsonDataDisplay from "@/components/ui/artistJsonTable"
+import ArtistJsonDataDisplay from "@/components/artistJsonTable"
 import {
   Card,
   CardContent,
@@ -12,17 +12,18 @@ import {
 import { Routes, Route } from "react-router-dom"
 import ArtistsPage from "./pages/artists"
 import ProductsPage from "./pages/products"
+import NavBar from "./components/ui/navbar"
 
 
 function App() {
-  // const [count, setCount] = useState(0)
-
   return (
-    <Routes>
-      <Route path="/" element={<ArtistsPage />} />
-      <Route path="/products" element={<ProductsPage />} />
-    </Routes>
-    
+    <>
+      <NavBar />
+      <Routes>
+        <Route path="/" element={<ArtistsPage />} />
+        <Route path="/products" element={<ProductsPage />} />
+      </Routes>
+    </>
   )
 }
 

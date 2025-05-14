@@ -1,10 +1,10 @@
 
 // import React from 'react'
-import JsonData from '../../data/products.json'
+import JsonData from '../data/products.json'
 import {
   Card,
   CardContent
-} from "./card"
+} from "./ui/card"
 import { cn } from "@/lib/utils"
 
 type ProductData = {

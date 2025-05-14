@@ -1,4 +1,4 @@
-import ArtistJsonDataDisplay from "@/components/ui/artistJsonTable";
+import ArtistJsonDataDisplay from "@/components/artistJsonTable";
 
 function ArtistsPage() {
   return (

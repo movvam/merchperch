@@ -1,10 +1,10 @@
 
 // import React from 'react'
-import JsonData from '../../data/artistShops.json'
+import JsonData from '../data/artistShops.json'
 import {
   Card,
   CardContent
-} from "./card"
+} from "./ui/card"
 import { cn } from "@/lib/utils"
 
 function Container({
