@@ -18,6 +18,7 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.6.0",
     "react-scroll-parallax": "^3.4.5",
+    "react-window": "^1.8.11",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7"
   },
@@ -25,6 +26,7 @@
     "@types/node": "^20.12.13",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
+    "@types/react-window": "^1.8.8",
     "@typescript-eslint/eslint-plugin": "^7.2.0",
     "@typescript-eslint/parser": "^7.2.0",
     "@vitejs/plugin-react": "^4.2.1",
