@@ -43,6 +43,7 @@ var (
 	state            = "abc123"
 	artistsWithShops []spotify.FullArtist
 	shopArtists      []ShopArtist
+	shopKeys         map[string]string
 )
 
 func main() {
@@ -167,6 +168,7 @@ func makeShopExistenceCheckRequest(wg *sync.WaitGroup, artist spotify.FullArtist
 		tokenRe := regexp.MustCompile(`[a-f0-9]{32}`)
 		token := tokenRe.Find(body)
 		log.Println("token", string(token))
+		shopKeys[artist.ID.String()] = string(token)
 
 		// Extract the first .myshopify.com domain
 		re := regexp.MustCompile(`[a-zA-Z0-9\-]+\.myshopify\.com`)
