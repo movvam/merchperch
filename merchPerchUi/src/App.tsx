@@ -9,28 +9,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Routes, Route } from "react-router-dom"
+import ArtistsPage from "./pages/artists"
+import ProductsPage from "./pages/products"
 
 
 function App() {
   // const [count, setCount] = useState(0)
 
   return (
-    <>
-      {/* <Button>Click me</Button> */}
-      <div className="app">
-      <header className="App-header">
-        <h1>
-          MerchPerch 
-        </h1>
-        <h5>
-          Find merch for all your favorite Spotify artists
-        </h5>
-      </header>
-      <ArtistJsonDataDisplay/>
-
-    </div>
-      
-    </>
+    <Routes>
+      <Route path="/" element={<ArtistsPage />} />
+      <Route path="/products" element={<ProductsPage />} />
+    </Routes>
+    
   )
 }
 
