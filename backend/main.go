@@ -16,11 +16,14 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
 
 	"github.com/zmb3/spotify/v2"
+
+	"github.com/machinebox/graphql"
 )
 
 // redirectURI is the OAuth redirect URI for the application.
@@ -29,21 +32,78 @@ import (
 const redirectURI = "http://localhost:8080/callback"
 
 type ShopArtist struct {
-	NAME             string          `json:"name"`
-	ID               string          `json:"id"`
-	SPOTIFY_SHOP_URL string          `json:"spotify_shop_url"`
-	SHOPIFY_URL      string          `json:"shopify_url"`
-	PHOTO_URL        string          `json:"photo_url"`
-	POPULARITY       spotify.Numeric `json:"popularity"`
+	NAME             string           `json:"name"`
+	ID               string           `json:"id"`
+	SPOTIFY_SHOP_URL string           `json:"spotify_shop_url"`
+	SHOPIFY_URL      string           `json:"shopify_url"`
+	PHOTO_URL        string           `json:"photo_url"`
+	POPULARITY       spotify.Numeric  `json:"popularity"`
+	PRODUCTS         []ShopifyProduct `json:"products"`
+}
+
+type ProductImage struct {
+	URL string `json:"url"`
+}
+
+type ProductVariantPrice struct {
+	Amount       string `json:"amount"`
+	CurrencyCode string `json:"currencyCode"`
+}
+
+type ProductVariant struct {
+	Price ProductVariantPrice `json:"price"`
+}
+
+type ShopifyProductWithArtist struct {
+	PRODUCT ShopifyProduct `json:"product"`
+	ARTIST  string         `json:"artist"`
+}
+
+type ShopifyProduct struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	ProductType string `json:"productType"`
+	Handle      string `json:"handle"`
+
+	Images struct {
+		Edges []struct {
+			Node ProductImage `json:"node"`
+		} `json:"edges"`
+	} `json:"images"`
+
+	Variants struct {
+		Edges []struct {
+			Node ProductVariant `json:"node"`
+		} `json:"edges"`
+	} `json:"variants"`
+}
+
+type ShopifyProductEdge struct {
+	Cursor string         `json:"cursor"`
+	Node   ShopifyProduct `json:"node"`
+}
+
+type TopLevelResponse struct {
+	Data ShopifyProductResponse `json:"data"`
+}
+
+type ShopifyProductResponse struct {
+	Products struct {
+		PageInfo struct {
+			HasNextPage bool `json:"hasNextPage"`
+		} `json:"pageInfo"`
+		Edges []ShopifyProductEdge `json:"edges"`
+	} `json:"products"`
 }
 
 var (
-	auth             = spotifyauth.New(spotifyauth.WithRedirectURL(redirectURI), spotifyauth.WithScopes(spotifyauth.ScopeUserFollowRead, spotifyauth.ScopeUserLibraryRead))
-	ch               = make(chan *spotify.Client)
-	state            = "abc123"
-	artistsWithShops []spotify.FullArtist
-	shopArtists      []ShopArtist
-	shopKeys         map[string]string
+	auth                 = spotifyauth.New(spotifyauth.WithRedirectURL(redirectURI), spotifyauth.WithScopes(spotifyauth.ScopeUserFollowRead, spotifyauth.ScopeUserLibraryRead))
+	ch                   = make(chan *spotify.Client)
+	state                = "abc123"
+	artistsThatHaveShops []spotify.FullArtist
+	shopArtists          []ShopArtist
+	shopKeys             = make(map[string]string)
+	products             []ShopifyProductWithArtist
 )
 
 func main() {
@@ -97,8 +157,83 @@ func main() {
 
 	wg.Wait()
 
-	fmt.Println("Artists with shops:", artistsWithShops)
+	fmt.Println("Artists with shops:", artistsThatHaveShops)
 	writeShops()
+}
+
+func queryShopifyStorefront(ctx context.Context, artistId string, storeURL string, token string) ([]ShopifyProductWithArtist, error) {
+	client := graphql.NewClient(storeURL, graphql.WithHTTPClient(&http.Client{}))
+
+	var allProducts []ShopifyProductWithArtist
+	var cursor *string
+
+	for {
+		// Build query with optional cursor
+		var b strings.Builder
+		b.WriteString(`query { products(first: 250`)
+		if cursor != nil {
+			b.WriteString(fmt.Sprintf(`, after: "%s"`, *cursor))
+		}
+		b.WriteString(`) {
+			pageInfo { hasNextPage }
+			edges {
+				cursor
+				node {
+					id
+					title
+					productType
+					handle
+					description
+					images(first: 250) {
+						edges {
+							node {
+								url
+							}
+						}
+					}
+					variants(first: 250) {
+						edges {
+							node {
+								price {
+									amount
+									currencyCode
+								}
+							}
+						}
+					}
+				}
+			}
+		}}`)
+		query := b.String()
+
+		// Create request
+		req := graphql.NewRequest(query)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Shopify-Storefront-Access-Token", token)
+
+		// Run query
+		var resp ShopifyProductResponse
+		if err := client.Run(ctx, req, &resp); err != nil {
+			return nil, err
+		}
+
+		// Append titles and get next cursor
+		edges := resp.Products.Edges
+		for _, edge := range edges {
+			allProducts = append(allProducts, ShopifyProductWithArtist{edge.Node, artistId})
+		}
+		fmt.Println("GOT PRODUCTS:", resp)
+		fmt.Println("GOT PRODUCTS:", allProducts)
+		// fmt.Println("HAS NEXT:", resp.Data.Products.PageInfo.HasNextPage)
+		break
+		// if !resp.Data.Products.PageInfo.HasNextPage {
+		// 	break
+		// }
+		// lastCursor := edges[len(edges)-1].Cursor
+		// cursor = &lastCursor
+	}
+
+	return allProducts, nil
 }
 
 func buildShopArtist(artist spotify.FullArtist) ShopArtist {
@@ -123,27 +258,15 @@ func buildShopArtist(artist spotify.FullArtist) ShopArtist {
 }
 
 func writeShops() {
-	var dataStr string
-	var artistsJson []ShopArtist
-
-	// Build the list of ShopArtist objects
-	// for _, artist := range artistsWithShops {
-	// 	shopArtist := buildShopArtist(artist)
-	// 	artistsJson = append(artistsJson, shopArtist)
-	// }
-
-	for _, shopArtist := range shopArtists {
-		artistsJson = append(artistsJson, shopArtist)
-	}
-
 	// Write to JSON file
-	data := []byte(dataStr)
-	err := os.WriteFile("followed_artists.txt", data, 0644)
+	jsonToWrite, _ := json.Marshal(shopArtists)
+	err := os.WriteFile("../merchPerchUi/src/data/artistShops.json", jsonToWrite, 0644)
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
-	jsonToWrite, _ := json.Marshal(artistsJson)
-	err = os.WriteFile("output.json", jsonToWrite, 0644)
+
+	jsonToWrite, _ = json.Marshal(products)
+	err = os.WriteFile("../merchPerchUi/src/data/products.json", jsonToWrite, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -162,8 +285,6 @@ func makeShopExistenceCheckRequest(wg *sync.WaitGroup, artist spotify.FullArtist
 			log.Fatalln("Failed to read response body:", err)
 		}
 
-		fmt.Println("body:", body)
-
 		// Extract 32-char hex token
 		tokenRe := regexp.MustCompile(`[a-f0-9]{32}`)
 		token := tokenRe.Find(body)
@@ -172,23 +293,37 @@ func makeShopExistenceCheckRequest(wg *sync.WaitGroup, artist spotify.FullArtist
 
 		// Extract the first .myshopify.com domain
 		re := regexp.MustCompile(`[a-zA-Z0-9\-]+\.myshopify\.com`)
-		match := re.Find(body)
-		if match == nil {
+		storefrontURL := re.Find(body)
+		if storefrontURL == nil {
 			log.Println("No Shopify domain found")
 			return
 		}
 
-		fmt.Println("Shopify URL:", string(match))
+		fmt.Println("Shopify URL:", string(storefrontURL))
+
+		allProducts, err := queryShopifyStorefront(context.Background(), artist.ID.String(),
+			fmt.Sprintf("https://%s/api/2025-04/graphql.json", string(storefrontURL)),
+			string(token))
+		if err != nil {
+			// handle error
+			log.Fatalln(fmt.Sprintf("Failed to query storefront %s response body: %s", storefrontURL, err))
+		}
+		var artistProducts []ShopifyProduct
+		for _, shopifyProductWithArist := range allProducts {
+			artistProducts = append(artistProducts, shopifyProductWithArist.PRODUCT)
+			products = append(products, shopifyProductWithArist)
+		}
 
 		shopArtists = append(shopArtists, ShopArtist{
 			ID:               artist.ID.String(),
 			NAME:             artist.Name,
 			SPOTIFY_SHOP_URL: fmt.Sprintf("https://shop.spotify.com/en/artist/%v/store", artist.ID.String()),
-			SHOPIFY_URL:      string(match),
+			SHOPIFY_URL:      string(storefrontURL),
 			PHOTO_URL:        artist.Images[0].URL,
 			POPULARITY:       artist.Popularity,
+			PRODUCTS:         artistProducts,
 		})
-		artistsWithShops = append(artistsWithShops, artist)
+		artistsThatHaveShops = append(artistsThatHaveShops, artist)
 	}
 	wg.Done()
 }
